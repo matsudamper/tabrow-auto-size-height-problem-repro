@@ -1,6 +1,8 @@
 package com.example.repro
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +49,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.platform.io.PlatformTestStorageRegistry
 
 /**
@@ -107,23 +110,49 @@ class TextAutoSizeIntrinsicHeightTest {
     }
 
     /**
-     * Saves screenshots of the first frame and after remeasure via the test storage service.
-     * They are pulled to app/build/outputs/connected_android_test_additional_output/.
-     * Top: without workaround, bottom: with workaround. The gray area is the parent Box.
+     * Saves a screenshot comparing the first frame (left) and after remeasure (right) via the
+     * test storage service. It is pulled to app/build/outputs/connected_android_test_additional_output/.
+     * In each column, top: without workaround, bottom: with workaround. The gray area is the parent Box.
      */
     @Test
     fun captureScreenshots() {
+        lateinit var initial: Bitmap
+        lateinit var afterRemeasure: Bitmap
         measureParentHeights(
-            onInitial = { saveScreenshot("1_initial") },
-            onAfterRemeasure = { saveScreenshot("2_after_remeasure") },
+            onInitial = { initial = captureRoot() },
+            onAfterRemeasure = { afterRemeasure = captureRoot() },
         )
+        val comparison = sideBySide(
+            "Initial" to initial,
+            "After remeasure" to afterRemeasure,
+        )
+        PlatformTestStorageRegistry.getInstance().openOutputFile("comparison.png").use {
+            comparison.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
     }
 
-    private fun saveScreenshot(name: String) {
-        val bitmap = rule.onRoot().captureToImage().asAndroidBitmap()
-        PlatformTestStorageRegistry.getInstance().openOutputFile("$name.png").use {
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+    private fun captureRoot(): Bitmap = rule.onRoot().captureToImage().asAndroidBitmap()
+
+    private fun sideBySide(vararg images: Pair<String, Bitmap>): Bitmap {
+        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        val padding = (16 * density).toInt()
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.BLACK
+            textSize = 14 * density
         }
+        val headerHeight = (paint.fontSpacing + padding).toInt()
+        val width = images.sumOf { it.second.width } + padding * (images.size + 1)
+        val height = headerHeight + images.maxOf { it.second.height } + padding * 2
+        val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(result)
+        canvas.drawColor(android.graphics.Color.WHITE)
+        var x = padding.toFloat()
+        images.forEach { (label, image) ->
+            canvas.drawText(label, x, padding - paint.ascent(), paint)
+            canvas.drawBitmap(image, x, (padding + headerHeight).toFloat(), null)
+            x += image.width + padding
+        }
+        return result
     }
 
     private data class ParentHeights(
@@ -148,6 +177,7 @@ class TextAutoSizeIntrinsicHeightTest {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 listOf(false, true).forEach { useWorkaround ->
+                    BasicText(if (useWorkaround) "With workaround" else "Without workaround")
                     AutoSizeText(
                         useWorkaround = useWorkaround,
                         remeasureTrigger = { remeasureTrigger },
