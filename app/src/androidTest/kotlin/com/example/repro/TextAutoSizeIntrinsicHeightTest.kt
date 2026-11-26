@@ -39,6 +39,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
@@ -187,7 +188,11 @@ class TextAutoSizeIntrinsicHeightTest {
             ) {
                 listOf(false, true).forEach { useWorkaround ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        BasicText(if (useWorkaround) "With workaround" else "Without workaround")
+                        // Label (not under test): small, gray and italic to distinguish it from the text under test
+                        BasicText(
+                            text = if (useWorkaround) "[label] With workaround" else "[label] Without workaround",
+                            style = LABEL_STYLE,
+                        )
                         AutoSizeText(
                             useWorkaround = useWorkaround,
                             remeasureTrigger = { remeasureTrigger },
@@ -280,6 +285,12 @@ private fun AutoSizeText(
         )
     }
 }
+
+private val LABEL_STYLE = TextStyle(
+    fontSize = 10.sp,
+    fontStyle = FontStyle.Italic,
+    color = Color.Gray,
+)
 
 private val MIN_FONT_SIZE = 8.sp
 private val MAX_FONT_SIZE = 20.sp
