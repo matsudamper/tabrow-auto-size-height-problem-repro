@@ -1,5 +1,8 @@
 package com.example.repro
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -12,6 +15,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.layout.IntrinsicMeasurable
 import androidx.compose.ui.layout.IntrinsicMeasureScope
 import androidx.compose.ui.layout.Measurable
@@ -22,9 +27,11 @@ import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.invalidateMeasurement
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -40,7 +47,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.annotation.GraphicsMode
+import androidx.test.platform.io.PlatformTestStorageRegistry
 
 /**
  * Reproduces an issue where the intrinsic height of a Text with `autoSize` does not take
@@ -56,7 +63,6 @@ import org.robolectric.annotation.GraphicsMode
  * on remeasure.
  */
 @RunWith(AndroidJUnit4::class)
-@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class TextAutoSizeIntrinsicHeightTest {
     @get:Rule
     val rule = createComposeRule()
@@ -100,6 +106,26 @@ class TextAutoSizeIntrinsicHeightTest {
         assertThat(heights.withWorkaroundAfterRemeasure).isEqualTo(heights.withoutWorkaroundAfterRemeasure)
     }
 
+    /**
+     * Saves screenshots of the first frame and after remeasure via the test storage service.
+     * They are pulled to app/build/outputs/connected_android_test_additional_output/.
+     * Top: without workaround, bottom: with workaround. The gray area is the parent Box.
+     */
+    @Test
+    fun captureScreenshots() {
+        measureParentHeights(
+            onInitial = { saveScreenshot("1_initial") },
+            onAfterRemeasure = { saveScreenshot("2_after_remeasure") },
+        )
+    }
+
+    private fun saveScreenshot(name: String) {
+        val bitmap = rule.onRoot().captureToImage().asAndroidBitmap()
+        PlatformTestStorageRegistry.getInstance().openOutputFile("$name.png").use {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+    }
+
     private data class ParentHeights(
         val withoutWorkaroundInitial: Dp,
         val withoutWorkaroundAfterRemeasure: Dp,
@@ -111,10 +137,16 @@ class TextAutoSizeIntrinsicHeightTest {
      * Lays out parents with and without the workaround side by side, and returns their heights
      * on the first measurement and after a remeasure with unchanged constraints.
      */
-    private fun measureParentHeights(): ParentHeights {
+    private fun measureParentHeights(
+        onInitial: () -> Unit = {},
+        onAfterRemeasure: () -> Unit = {},
+    ): ParentHeights {
         var remeasureTrigger by mutableIntStateOf(0)
         rule.setContent {
-            Column {
+            Column(
+                modifier = Modifier.background(Color.White),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 listOf(false, true).forEach { useWorkaround ->
                     AutoSizeText(
                         useWorkaround = useWorkaround,
@@ -128,8 +160,11 @@ class TextAutoSizeIntrinsicHeightTest {
 
         val withoutWorkaroundInitial = height(useWorkaround = false)
         val withWorkaroundInitial = height(useWorkaround = true)
+        onInitial()
 
         rule.runOnIdle { remeasureTrigger++ }
+        rule.waitForIdle()
+        onAfterRemeasure()
 
         return ParentHeights(
             withoutWorkaroundInitial = withoutWorkaroundInitial,
@@ -154,7 +189,8 @@ private fun AutoSizeText(
     Box(
         modifier = modifier
             .width(100.dp)
-            .height(IntrinsicSize.Max),
+            .height(IntrinsicSize.Max)
+            .background(Color.LightGray),
     ) {
         BasicText(
             text = text,

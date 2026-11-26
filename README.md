@@ -17,7 +17,7 @@ The intrinsic height reflects the auto-sized font size from the first measuremen
 
 ## Reproduction
 
-[`TextAutoSizeIntrinsicHeightTest`](app/src/test/kotlin/com/example/repro/TextAutoSizeIntrinsicHeightTest.kt) (Robolectric, `GraphicsMode.NATIVE`):
+[`TextAutoSizeIntrinsicHeightTest`](app/src/androidTest/kotlin/com/example/repro/TextAutoSizeIntrinsicHeightTest.kt) (instrumented test on an emulator):
 
 - A `Box` with `width(100.dp).height(IntrinsicSize.Max)` contains a single-line `BasicText` with `TextAutoSize.StepBased(8.sp, 20.sp, 1.sp)`.
 - The test reads the parent's height on the first frame, then forces a remeasure of the Text without changing constraints, and reads it again.
@@ -27,14 +27,15 @@ The intrinsic height reflects the auto-sized font size from the first measuremen
 | `parentHeightShrinksAfterRemeasure` | passes (demonstrates the bug) |
 | `parentHeightIsStableWithoutWorkaround` | **fails** (expected behavior) |
 | `parentHeightIsCorrectFromFirstMeasureWithWorkaround` | passes (workaround) |
+| `captureScreenshots` | saves `1_initial.png` / `2_after_remeasure.png` (top: without workaround, bottom: with workaround; gray = parent Box) |
 
 Run:
 
 ```bash
-./gradlew :app:testDebugUnitTest
+./gradlew :app:connectedDebugAndroidTest
 ```
 
-GitHub Actions runs the same tests: see the [Reproduce workflow](../../actions/workflows/test.yml).
+GitHub Actions runs the same tests on an API 35 emulator and uploads the test report and screenshots as artifacts: see the [Reproduce workflow](../../actions/workflows/test.yml).
 
 ## Workaround
 
@@ -44,4 +45,4 @@ A `LayoutModifierNode` that overrides `minIntrinsicHeight` / `maxIntrinsicHeight
 
 - Compose Foundation 1.13.0
 - AGP 9.5.3 / Kotlin 2.4.21
-- Robolectric 4.18.1
+- Emulator: API 35 (google_apis, x86_64)
