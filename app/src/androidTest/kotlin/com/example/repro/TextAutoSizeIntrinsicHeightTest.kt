@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
@@ -110,9 +111,9 @@ class TextAutoSizeIntrinsicHeightTest {
     }
 
     /**
-     * Saves a screenshot comparing the first frame (left) and after remeasure (right) via the
-     * test storage service. It is pulled to app/build/outputs/connected_android_test_additional_output/.
-     * In each column, top: without workaround, bottom: with workaround. The gray area is the parent Box.
+     * Saves a screenshot of the first frame (top) and after remeasure (bottom) via the test storage
+     * service. It is pulled to app/build/outputs/connected_android_test_additional_output/.
+     * In each row, left: without workaround, right: with workaround. The gray area is the parent Box.
      */
     @Test
     fun captureScreenshots() {
@@ -122,7 +123,7 @@ class TextAutoSizeIntrinsicHeightTest {
             onInitial = { initial = captureRoot() },
             onAfterRemeasure = { afterRemeasure = captureRoot() },
         )
-        val comparison = sideBySide(
+        val comparison = stacked(
             "Initial" to initial,
             "After remeasure" to afterRemeasure,
         )
@@ -133,24 +134,26 @@ class TextAutoSizeIntrinsicHeightTest {
 
     private fun captureRoot(): Bitmap = rule.onRoot().captureToImage().asAndroidBitmap()
 
-    private fun sideBySide(vararg images: Pair<String, Bitmap>): Bitmap {
+    private fun stacked(vararg images: Pair<String, Bitmap>): Bitmap {
         val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
         val padding = (16 * density).toInt()
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = android.graphics.Color.BLACK
             textSize = 14 * density
+            isFakeBoldText = true
         }
-        val headerHeight = (paint.fontSpacing + padding).toInt()
-        val width = images.sumOf { it.second.width } + padding * (images.size + 1)
-        val height = headerHeight + images.maxOf { it.second.height } + padding * 2
+        val headerHeight = paint.fontSpacing.toInt()
+        val width = images.maxOf { it.second.width } + padding * 2
+        val height = images.sumOf { headerHeight + it.second.height } + padding * (images.size + 1)
         val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
         canvas.drawColor(android.graphics.Color.WHITE)
-        var x = padding.toFloat()
+        var y = padding.toFloat()
         images.forEach { (label, image) ->
-            canvas.drawText(label, x, padding - paint.ascent(), paint)
-            canvas.drawBitmap(image, x, (padding + headerHeight).toFloat(), null)
-            x += image.width + padding
+            canvas.drawText(label, padding.toFloat(), y - paint.ascent(), paint)
+            y += headerHeight
+            canvas.drawBitmap(image, padding.toFloat(), y, null)
+            y += image.height + padding
         }
         return result
     }
@@ -172,17 +175,20 @@ class TextAutoSizeIntrinsicHeightTest {
     ): ParentHeights {
         var remeasureTrigger by mutableIntStateOf(0)
         rule.setContent {
-            Column(
+            // Side by side and top-aligned, so that the heights can be compared directly
+            Row(
                 modifier = Modifier.background(Color.White),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 listOf(false, true).forEach { useWorkaround ->
-                    BasicText(if (useWorkaround) "With workaround" else "Without workaround")
-                    AutoSizeText(
-                        useWorkaround = useWorkaround,
-                        remeasureTrigger = { remeasureTrigger },
-                        modifier = Modifier.testTag(parentTag(useWorkaround)),
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        BasicText(if (useWorkaround) "With workaround" else "Without workaround")
+                        AutoSizeText(
+                            useWorkaround = useWorkaround,
+                            remeasureTrigger = { remeasureTrigger },
+                            modifier = Modifier.testTag(parentTag(useWorkaround)),
+                        )
+                    }
                 }
             }
         }
