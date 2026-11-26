@@ -56,7 +56,7 @@ jobs:
           out = "\n".join(lines)
           print(out)
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
-              s.write("## Test results\n\n" + out + "\n\nScreenshots are uploaded as the `screenshots-*` artifact.\n")
+              s.write("## Test results\n\n" + out + "\n\nScreenshots (`1_initial.png`, `2_after_remeasure.png`) are uploaded as artifacts and can be opened directly in the browser.\n")
 
       - name: Upload test report
         if: always()
@@ -65,9 +65,18 @@ jobs:
           name: test-report-api${{ matrix.api-level }}
           path: app/build/reports/androidTests/connected/
 
-      - name: Upload screenshots
+      - name: Upload screenshot (1_initial)
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: screenshots-api${{ matrix.api-level }}
-          path: app/build/outputs/connected_android_test_additional_output/
+          # Upload without zip so it can be viewed directly in the browser
+          archive: false
+          path: app/build/outputs/connected_android_test_additional_output/**/1_initial.png
+
+      - name: Upload screenshot (2_after_remeasure)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          # Upload without zip so it can be viewed directly in the browser
+          archive: false
+          path: app/build/outputs/connected_android_test_additional_output/**/2_after_remeasure.png
