@@ -27,7 +27,7 @@ The intrinsic height reflects the auto-sized font size from the first measuremen
 | `parentHeightShrinksAfterRemeasure` | passes (demonstrates the bug) |
 | `parentHeightIsStableWithoutWorkaround` | **fails** (expected behavior) |
 | `parentHeightIsCorrectFromFirstMeasureWithWorkaround` | passes (workaround) |
-| `captureScreenshots` | saves `comparison.png` (top: first frame, bottom: after remeasure; left: without workaround, right: with workaround; gray = parent Box; red / blue dashed lines = bottom of each parent Box) |
+| `captureScreenshots` | saves `comparison.png` (top: first frame, bottom: after remeasure; left: without workaround, right: with workaround; gray = parent Box; red / blue line = top edge of each parent Box) |
 
 Run:
 

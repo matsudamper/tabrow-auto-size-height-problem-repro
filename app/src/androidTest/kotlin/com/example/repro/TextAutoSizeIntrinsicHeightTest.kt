@@ -2,7 +2,6 @@ package com.example.repro
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.DashPathEffect
 import android.graphics.Paint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +18,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.layout.IntrinsicMeasurable
@@ -115,15 +116,15 @@ class TextAutoSizeIntrinsicHeightTest {
      * Saves a screenshot of the first frame (top) and after remeasure (bottom) via the test storage
      * service. It is pulled to app/build/outputs/connected_android_test_additional_output/.
      * In each row, left: without workaround, right: with workaround. The gray area is the parent Box.
-     * Horizontal guide lines mark the bottom of each parent Box.
+     * A colored line marks the top edge of each parent Box (red: without workaround, blue: with workaround).
      */
     @Test
     fun captureScreenshots() {
         lateinit var initial: Bitmap
         lateinit var afterRemeasure: Bitmap
         measureParentHeights(
-            onInitial = { initial = captureWithGuides() },
-            onAfterRemeasure = { afterRemeasure = captureWithGuides() },
+            onInitial = { initial = captureRoot() },
+            onAfterRemeasure = { afterRemeasure = captureRoot() },
         )
         val comparison = stacked(
             "Initial" to initial,
@@ -134,27 +135,7 @@ class TextAutoSizeIntrinsicHeightTest {
         }
     }
 
-    /**
-     * Captures the root and draws horizontal guide lines across the whole width at the bottom of each
-     * parent Box (red: without workaround, blue: with workaround), so the heights can be compared at a glance.
-     */
-    private fun captureWithGuides(): Bitmap {
-        val bitmap = rule.onRoot().captureToImage().asAndroidBitmap().copy(Bitmap.Config.ARGB_8888, true)
-        val canvas = Canvas(bitmap)
-        val strokeWidth = 2 * density
-        listOf(false to android.graphics.Color.RED, true to android.graphics.Color.BLUE).forEach { (useWorkaround, color) ->
-            val bottom = rule.onNodeWithTag(parentTag(useWorkaround)).fetchSemanticsNode().boundsInRoot.bottom
-            val paint = Paint().apply {
-                this.color = color
-                this.strokeWidth = strokeWidth
-                // Dashed for the second line so that both stay visible when they overlap
-                if (useWorkaround) pathEffect = DashPathEffect(floatArrayOf(8 * density, 8 * density), 0f)
-            }
-            val y = bottom - strokeWidth / 2
-            canvas.drawLine(0f, y, bitmap.width.toFloat(), y, paint)
-        }
-        return bitmap
-    }
+    private fun captureRoot(): Bitmap = rule.onRoot().captureToImage().asAndroidBitmap()
 
     private val density: Float
         get() = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
@@ -166,21 +147,13 @@ class TextAutoSizeIntrinsicHeightTest {
             textSize = 14 * density
             isFakeBoldText = true
         }
-        val legendPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.DKGRAY
-            textSize = 12 * density
-        }
-        val legend = "Red: bottom of \"Without workaround\" / Blue (dashed): bottom of \"With workaround\""
         val headerHeight = paint.fontSpacing.toInt()
-        val legendHeight = legendPaint.fontSpacing.toInt()
-        val width = maxOf(images.maxOf { it.second.width }, legendPaint.measureText(legend).toInt()) + padding * 2
-        val height = legendHeight + images.sumOf { headerHeight + it.second.height } + padding * (images.size + 2)
+        val width = images.maxOf { it.second.width } + padding * 2
+        val height = images.sumOf { headerHeight + it.second.height } + padding * (images.size + 1)
         val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
         canvas.drawColor(android.graphics.Color.WHITE)
         var y = padding.toFloat()
-        canvas.drawText(legend, padding.toFloat(), y - legendPaint.ascent(), legendPaint)
-        y += legendHeight + padding
         images.forEach { (label, image) ->
             canvas.drawText(label, padding.toFloat(), y - paint.ascent(), paint)
             y += headerHeight
@@ -258,7 +231,14 @@ private fun AutoSizeText(
         modifier = modifier
             .width(100.dp)
             .height(IntrinsicSize.Max)
-            .background(Color.LightGray),
+            .background(Color.LightGray)
+            // Colored line at the top edge of the parent Box
+            .drawBehind {
+                drawRect(
+                    color = if (useWorkaround) Color.Blue else Color.Red,
+                    size = Size(width = size.width, height = 2.dp.toPx()),
+                )
+            },
     ) {
         BasicText(
             text = text,
